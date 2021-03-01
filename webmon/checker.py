@@ -32,6 +32,10 @@ class WebsiteChecker(object):
         self.running = True
 
     def check_and_report(self, website_key):
+        """
+        Runs a check and reports a result for a single website_key - intended to be run in
+        the ThreadPoolExecutor.
+        """
         try:
             self.report_result(website_key, self.check_site(website_key))
         except Exception as exc:
@@ -118,6 +122,10 @@ class WebsiteChecker(object):
         )
 
     def report_result(self, website_key, result):
+        """
+        Reports one result for a website to Kafka. If there's an error publishing to Kafka,
+        the error will be logged and this method will continue rather than raising an exception.
+        """
         self.logger.debug("Sending %s result %s to Kafka", website_key, result)
         try:
             future = self.producer.send(
@@ -161,12 +169,17 @@ class WebsiteChecker(object):
             )
 
     def run_checker(self):
+        """
+        Runs the checker until the stop() method is called.
+        """
         self.create_topics()
         self.producer = KafkaProducer(
             value_serializer=lambda m: json.dumps(m.asdict()).encode("utf-8"), retries=3, **self.common_kafka_args()
         )
         while self.running:
             self.last_check = time.monotonic()
+            # Actual checks are run in a ThreadPoolExecutor to make the checks run concurrently
+            # and simplify the scheduling of checks every check_interval
             self.executor.map(self.check_and_report, self.to_check.keys())
             time_to_sleep = (self.last_check + self.check_interval) - time.monotonic()
             if self.running and time_to_sleep > 0:
@@ -178,6 +191,9 @@ class WebsiteChecker(object):
 
 
 def run_checker_app():
+    """
+    CLI entrypoint for running the checker component.
+    """
     logging.config.dictConfig(get_logging_config(os.environ.get("WBM_LOGLEVEL", "INFO")))
     config = CheckerConfig.from_environment()
     checker = WebsiteChecker(config)

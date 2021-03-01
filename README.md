@@ -1,3 +1,30 @@
+# webmon
+
+This is a system which monitors website availability over a network.
+
+The system consists of two components, the website checker and the database recorder.
+
+For each website to be monitored, an alphanumeric "website key" should be chosen to identify that
+website, e.g. "google", "facebook", "sitea" or similar.
+
+The checker component will publish results for each configured website key to a Kafka topic
+containing the key, `webmon.<website key>.checkresult`.
+
+The recorder component then consumes on the topics for its configured website keys and stores the
+consumed results in a PostgreSQL database.
+
+Due to using separate topics, several instances for checking different websites can coexist using
+the same Kafka cluster, as long as they use different website keys. It's also possible to divide
+result recording between different instances of the recorder component by giving them different
+sets of website keys to consume, or route the results of many checkers running at different intervals
+to one recorder by configuring it to record all the checked website keys.
+
+There is an optional command to summarize the logged results for a given day, and delete the logged
+results from the database after storing a summary, which can be used to mitigate growth in size
+of the table storing the individual logged results - after a month, for example, the daily results
+could be summarized and the individual log records deleted, by invoking this command using cron or
+a similar approach.
+
 # Installing
 
 The program can be installed as a Python package, or built into a Docker image and run in
@@ -9,15 +36,13 @@ To install as a Python package, use `pip`:
 pip install git+https://github.com/sigmaris/webmon.git@main
 ```
 
-To run in a Docker container, first check out the repository, change directory into the repository, and build and tag an image:
+To use a Docker container, first check out the repository, change directory into the repository, and build and tag an image:
 
 ```
 docker build . -t webmon
 ```
 
 This image tagged "webmon" can then be used to run the checker and recorder components as described below.
-
-The program consists of two components, the website checker and the database recorder.
 
 # Website checker
 
@@ -38,7 +63,7 @@ It is configured by setting environment variables, as follows:
 | WBM_CHECK_INTERVAL | Optionally specify the interval in seconds to check each site periodically. If not explicitly set, defaults to every 60 seconds |
 | WBM_LOGLEVEL | Optionally specify a log level e.g. DEBUG. Defaults to INFO if not explicitly set. |
 
-## Running the checker
+## Running the checker component
 
 After setting the above environment variables, run the website checker if installed as a Python package with the command:
 
@@ -63,7 +88,7 @@ docker run \
   webmon webmon-checker
 ```
 
-# Database recorder
+# Database recorder component
 
 This component runs constantly, consuming Kafka messages published by the website checker
 component. Upon receipt of a message it records it in a PostgreSQL database.
@@ -84,7 +109,7 @@ It is configured by setting environment variables, as follows:
 
 ### Running if installed as a Python package
 
-First set the above environment variables then, once only, initialize the database:
+First set the above environment variables, then, once only, initialize the database:
 
 ```
 webmon-recorder initdb
@@ -102,8 +127,12 @@ webmon-recorder record
 
 ### Running in a Docker container
 
-Alternatively, to run in a Docker container a volume must be mounted to provide the Kafka SSL files to the container, and
-the above environment variables must be passed into the container. To initialise the database:
+To run in a Docker container a volume must be mounted to provide the Kafka SSL files to the container, and
+the above environment variables must be passed into the container.
+
+All of the webmon-recorder subcommands described above and in sections below can also be run in a
+Docker container by prepending the Docker command and arguments to the webmon-recorder command,
+e.g. to run `webmon-recorder initdb` in a Docker container, use:
 
 ```
 # Adjust the path where your Kafka certs are located, and the other environment variables described above, as appropriate
@@ -118,30 +147,41 @@ docker run \
   webmon webmon-recorder initdb
 ```
 
-Then, after the checker is running, to run the recorder component in recording mode:
+This also goes for the "record", "display" and "rollup" subcommands.
+
+## Displaying recorded results
+
+To display a list of the most recently recorded results in the terminal, use the command:
 
 ```
-# Adjust the path where your Kafka certs are located, and the other environment variables described above, as appropriate
-docker run \
-  -v /path/to/kafka/cert/dir:/certificates \
-  -e WBM_KAFKA_BOOT_SERVERS \
-  -e WBM_KAFKA_CERTFILE=/certificates/kafka_cert.pem \
-  -e WBM_KAFKA_KEYFILE=/certificates/kafka_privkey.pem \
-  -e WBM_KAFKA_CAFILE=/certificates/kafka_cafile.pem \
-  -e WBM_WEBSITE_KEYS \
-  -e WBM_DB_CONN_STR \
-  webmon webmon-recorder record
+webmon-recorder display
 ```
 
-# Design
+This command takes optional flags `--limit N` to limit the results displayed to N rows (the default is 50),
+`--date` to display a certain date in the past rather than the latest results, and `--summary` to display
+a summary per website key instead of a list of all results.
 
-The code is all contained within one Python package, so the PostgreSQL client psycopg2
-is installed as a requirement of the website checker, even though the website checker
-doesn't use the database directly. This could be changed if the checker and the database
-recorder were split into two packages - or if psycopg2 was made an optional requirement.
+## Storing summaries and trimming logged results
 
-https://stackoverflow.com/questions/7370801/how-to-measure-elapsed-time-in-python
-https://stackoverflow.com/questions/14592762/a-good-way-to-get-the-charset-encoding-of-an-http-response-in-python
+A daily summary - similar to that displayed by the `--summary` flag to the `display` subcommand - can be
+stored in the database, and then the logged results for that day can optionally be deleted to save space.
+
+The command:
+
+```
+webmon-recorder rollup
+```
+
+will store daily summaries based on all individual logged results in the database. These summaries will then
+be used when `webmon-recorder display --summary` is used, instead of calculating the summary on-the-fly.
+
+To summarize and then delete the individual logged results for a given date to save space, use:
+
+```
+webmon-recorder rollup --date <YYYY-MM-DD> --trim
+```
+
+# Development
 
 ## Installing for local development
 
@@ -150,6 +190,8 @@ https://stackoverflow.com/questions/14592762/a-good-way-to-get-the-charset-encod
 1. Run `pip install -e '.[dev]'` to install an editable version of the project in the
    Python environment, with the "dev" extra activated (to pull in the test requirements)
 
+# Testing
+
 ## Running tests in a local environment
 
 The non-integration tests do require PostgreSQL to be installed, though not necessarily running.
@@ -157,6 +199,11 @@ They launch and stop an isolated instance of PostgreSQL during the test lifecycl
 
 After performing the above steps to install into a local virtualenv, activate that 
 environment and run `pytest` to run all the non-integration tests.
+
+## Test coverage
+
+Adding `--cov=webmon --cov-report html` arguments to the `pytest` command will produce a HTML
+coverage report in the `htmlcov` directory.
 
 ## Running tests in a Docker container
 
@@ -179,8 +226,7 @@ and tests re-run quickly, instead of rebuilding the whole image:
 docker run -v $(pwd):/src webmon-tests bash -c "pip3.7 install -e '.[dev]' && pytest"
 ```
 
-
-### Integration tests
+## Integration tests
 
 The integration tests can be enabled by adding the `--inttests` flag to `pytest`.
 
