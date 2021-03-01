@@ -8,4 +8,4 @@ jobs:
     - name: Build Docker image for tests
       run: docker build -f Dockerfile.tests -t webmon-tests .
     - name: Run tests in container
-      run: docker run webmon-tests pytest
+      run: docker run webmon-tests pytest --cov=webmon --cov-report term
