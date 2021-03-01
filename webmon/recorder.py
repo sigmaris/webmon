@@ -8,8 +8,10 @@ import argparse
 from datetime import datetime
 import json
 import logging
+import logging.config
 import os
 import re
+import signal
 
 import iso8601
 from kafka import KafkaConsumer
@@ -17,6 +19,7 @@ from psycopg2.pool import SimpleConnectionPool
 import psycopg2.extras
 from tabulate import tabulate
 
+from . import get_logging_config
 from .config import RecorderConfig, topic_for_website_key, website_key_for_topic
 from .model import CheckResult
 
@@ -138,10 +141,17 @@ class DatabaseRecorder(object):
         This method runs the Kafka consumer and writes results into the database until a shutdown signal
         is received.
         """
-        topics = [topic_for_website_key(key) for key in self.website_keys]
-        self.logger.debug("Consuming on topics: %s", ", ".join(topics))
+        if self.website_keys == ["*"]:
+            topics = []
+            kwargs = {"pattern": r"webmon\.[^.]+\.checkresult"}
+            self.logger.debug("Consuming webmon.*.checkresult")
+        else:
+            topics = [topic_for_website_key(key) for key in self.website_keys]
+            self.logger.debug("Consuming on topics: %s", ", ".join(topics))
+            kwargs = {}
         consumer = KafkaConsumer(
             *topics,
+            **kwargs,
             bootstrap_servers=self.bootstrap_servers,
             client_id="webmon-recorder",
             group_id="webmon-recorder",
@@ -153,8 +163,8 @@ class DatabaseRecorder(object):
             ssl_keyfile=self.kafka_keyfile,
             ssl_cafile=self.kafka_cafile,
         )
+        self.logger.debug("Running Kafka consumer")
         while self.running:
-            self.logger.debug("Running Kafka consumer")
             for message in consumer:
                 self.logger.debug("Received %s on topic %s", message.value, message.topic)
                 self.record_result(website_key_for_topic(message.topic), message.value)
@@ -163,6 +173,7 @@ class DatabaseRecorder(object):
 
     def stop(self):
         self.running = False
+        self.logger.info("Shutting down recorder...")
 
     def record_result(self, website_key, result):
         """
@@ -203,12 +214,18 @@ def tabulate_result(cursor):
 
 
 def setup_logging():
-    # TODO: maybe lower log level for Kafka?
-    logging.basicConfig(level=os.environ.get("WBM_LOGLEVEL", "INFO"))
+    logging.config.dictConfig(get_logging_config(os.environ.get("WBM_LOGLEVEL", "INFO")))
 
 
 def run_record(config, args):
     recorder = DatabaseRecorder(config)
+
+    def shutdown(signum, frame):
+        recorder.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
     recorder.run_consumer()
 
 

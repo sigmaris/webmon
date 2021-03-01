@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="webmon",
     packages=["webmon"],
-    version="0.1.0",
+    version="1.0.0",
     description="A system that monitors website availability over a network",
     author="Hugh Cole-Baker",
     license="BSD",

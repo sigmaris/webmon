@@ -2,7 +2,9 @@ from concurrent.futures import ThreadPoolExecutor
 import http.client
 import json
 import logging
+import logging.config
 import os
+import signal
 import time
 import urllib.parse
 import uuid
@@ -11,6 +13,7 @@ from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import KafkaError
 
+from . import get_logging_config
 from .config import CheckerConfig, topic_for_website_key
 from .model import CheckResult
 
@@ -171,10 +174,18 @@ class WebsiteChecker(object):
 
     def stop(self):
         self.running = False
+        self.logger.info("Shutting down checker...")
 
 
 def run_checker_app():
-    logging.basicConfig(level=os.environ.get("WBM_LOGLEVEL", "INFO"))
+    logging.config.dictConfig(get_logging_config(os.environ.get("WBM_LOGLEVEL", "INFO")))
     config = CheckerConfig.from_environment()
     checker = WebsiteChecker(config)
+
+    def shutdown(signum, frame):
+        checker.stop()
+
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
+
     checker.run_checker()

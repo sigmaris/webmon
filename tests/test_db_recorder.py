@@ -28,7 +28,7 @@ def recorder_config(postgresql):
     )
 
 
-def make_check_result(timestamp, url, response_code=200, response_time_ms=200, pattern_matched=True):
+def make_check_result(timestamp, url, response_code=200, response_time_ms=200, pattern_matched=True, connect_error=None):
     """
     Create a CheckResult for testing purposes
     """
@@ -36,7 +36,7 @@ def make_check_result(timestamp, url, response_code=200, response_time_ms=200, p
         check_id=uuid.uuid4(),
         check_time=timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
         url=url,
-        connect_error=None,  # TODO: test errors
+        connect_error=connect_error,
         response_code=response_code,
         response_time_ms=response_time_ms,
         pattern_matched=pattern_matched,
@@ -87,6 +87,32 @@ def test_recording_rows(inited_db, recorder_config):
         ("mywebsite2", 1, "https://mywebsite2.com/path?query=val"),
         ("mywebsite3", 1, "https://mywebsite3.com/path?query=val"),
     ]
+
+
+def test_record_error(inited_db, recorder_config):
+    check_time = datetime(2020, 2, 3, 12, 0, 0, tzinfo=timezone.utc)
+    result = make_check_result(
+        check_time,
+        "https://bad.website/foo",
+        response_code=None,
+        response_time_ms=None,
+        pattern_matched=None,
+        connect_error="fake connect error"
+    )
+    recorder = DatabaseRecorder(recorder_config)
+    recorder.record_result(f"badwebsite", result)
+    assert db_query(
+        inited_db,
+        """
+        SELECT
+            website_key, check_time, url, connect_error,
+            response_code, response_time_ms, pattern_matched
+        FROM check_result_log
+        """,
+    ) == [
+        ("badwebsite", check_time, "https://bad.website/foo", "fake connect error", None, None, None),
+    ]
+
 
 
 def test_duplicate_result(inited_db, recorder_config, caplog):

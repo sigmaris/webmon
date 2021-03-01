@@ -144,7 +144,7 @@ def test_all_responses(external_postgres, running_components):
 
     # The "bad" URL should result in a connection error
     assert results_by_key["test_bad"][0].endswith("/bad")
-    assert "Connection refused" in results_by_key["test_bad"][1]
+    assert "Errno" in results_by_key["test_bad"][1]
     assert results_by_key["test_bad"][3:5] == (None, None)
 
     assert results_by_key["test_pat"][0].endswith("/pat")
