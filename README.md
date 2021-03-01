@@ -19,8 +19,8 @@ result recording between different instances of the recorder component by giving
 sets of website keys to consume, or route the results of many checkers running at different intervals
 to one recorder by configuring it to record all the checked website keys.
 
-There is an optional command to summarize the logged results for a given day, and delete the logged
-results from the database after storing a summary, which can be used to mitigate growth in size
+There is an optional `rollup` subcommand to summarize the logged results for a given day, and delete
+the logged results from the database after storing a summary, which can be used to mitigate growth in size
 of the table storing the individual logged results - after a month, for example, the daily results
 could be summarized and the individual log records deleted, by invoking this command using cron or
 a similar approach.
@@ -44,7 +44,7 @@ docker build . -t webmon
 
 This image tagged "webmon" can then be used to run the checker and recorder components as described below.
 
-# Website checker
+# Website checker component
 
 This component runs constantly and periodically checks the uptime and response time of a
 configured list of websites, and publishes the results to a Kafka topic per site.
@@ -117,7 +117,7 @@ webmon-recorder initdb
 
 This will create the database tables used for storing results.
 
-Then, run the website checker component as above, which will create the topics in Kafka.
+Then, run the website checker component as above, which will create the topics in Kafka for its given website keys.
 
 Then, run the recorder component in recording mode:
 
@@ -147,7 +147,7 @@ docker run \
   webmon webmon-recorder initdb
 ```
 
-This also goes for the "record", "display" and "rollup" subcommands.
+This also applies equally to the "record", "display" and "rollup" subcommands.
 
 ## Displaying recorded results
 

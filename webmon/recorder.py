@@ -148,7 +148,7 @@ class DatabaseRecorder(object):
             self.logger.debug("Consuming webmon.*.checkresult")
         else:
             topics = [topic_for_website_key(key) for key in self.website_keys]
-            pattern=None
+            pattern = None
             self.logger.debug("Consuming on topics: %s", ", ".join(topics))
         consumer = KafkaConsumer(
             *topics,
@@ -283,9 +283,9 @@ def run_display(config, args):
                 if curs.rowcount == 0:
                     if args.date is not None:
                         optional_where = "WHERE DATE(check_time) = %(day)s"
-                    curs.execute(SUMMARY_SELECT_SQL.format(
-                        optional_where=optional_where, order_by="ORDER BY 2 DESC, 1"
-                    ), params)
+                    curs.execute(
+                        SUMMARY_SELECT_SQL.format(optional_where=optional_where, order_by="ORDER BY 2 DESC, 1"), params
+                    )
             else:
                 if args.date is not None:
                     optional_where = "WHERE DATE(check_time) = %(day)s"

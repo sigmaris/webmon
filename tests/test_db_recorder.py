@@ -28,7 +28,9 @@ def recorder_config(postgresql):
     )
 
 
-def make_check_result(timestamp, url, response_code=200, response_time_ms=200, pattern_matched=True, connect_error=None):
+def make_check_result(
+    timestamp, url, response_code=200, response_time_ms=200, pattern_matched=True, connect_error=None
+):
     """
     Create a CheckResult for testing purposes
     """
@@ -97,7 +99,7 @@ def test_record_error(inited_db, recorder_config):
         response_code=None,
         response_time_ms=None,
         pattern_matched=None,
-        connect_error="fake connect error"
+        connect_error="fake connect error",
     )
     recorder = DatabaseRecorder(recorder_config)
     recorder.record_result(f"badwebsite", result)
@@ -112,7 +114,6 @@ def test_record_error(inited_db, recorder_config):
     ) == [
         ("badwebsite", check_time, "https://bad.website/foo", "fake connect error", None, None, None),
     ]
-
 
 
 def test_duplicate_result(inited_db, recorder_config, caplog):

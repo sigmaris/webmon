@@ -122,10 +122,7 @@ def test_all_responses(external_postgres, running_components):
     else:
         results = []
 
-    results_by_key = {
-        row[0]: row[1:]
-        for row in results
-    }
+    results_by_key = {row[0]: row[1:] for row in results}
 
     assert results_by_key["test_foo"][0].endswith("/foo?bar=baz")
     assert results_by_key["test_foo"][1:3] == (None, 200)

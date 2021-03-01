@@ -8,10 +8,10 @@ setup(
     author="Hugh Cole-Baker",
     license="BSD",
     author_email="sigmaris@gmail.com",
-    url='https://github.com/sigmaris/webmon',
+    url="https://github.com/sigmaris/webmon",
     python_requires=">=3.7",
     install_requires=[
-        'iso8601 == 0.1.14',
+        "iso8601 == 0.1.14",
         'psycopg2 ~= 2.8 ; sys_platform != "darwin"',
         'psycopg2-binary ~= 2.8 ; sys_platform == "darwin"',
         "kafka-python ~= 2.0",
