@@ -62,9 +62,10 @@ class RecorderConfig(NamedTuple):
     def from_environment(cls):
         website_keys = os.environ.get("WBM_WEBSITE_KEYS", "*").split(",")
 
-        for key in website_keys:
-            if re.match(r"^[\w_-]+$", key) is None:
-                raise ConfigurationError("Each website key must consist of alphanumeric -, and _ characters only.")
+        if website_keys != ["*"]:
+            for key in website_keys:
+                if re.match(r"^[\w_-]+$", key) is None:
+                    raise ConfigurationError("Each website key must consist of alphanumeric -, and _ characters only.")
 
         try:
             database_conn_str = os.environ["WBM_DB_CONN_STR"]

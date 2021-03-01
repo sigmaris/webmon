@@ -143,15 +143,14 @@ class DatabaseRecorder(object):
         """
         if self.website_keys == ["*"]:
             topics = []
-            kwargs = {"pattern": r"webmon\.[^.]+\.checkresult"}
+            pattern = r"webmon\.[^.]+\.checkresult"
             self.logger.debug("Consuming webmon.*.checkresult")
         else:
             topics = [topic_for_website_key(key) for key in self.website_keys]
+            pattern=None
             self.logger.debug("Consuming on topics: %s", ", ".join(topics))
-            kwargs = {}
         consumer = KafkaConsumer(
             *topics,
-            **kwargs,
             bootstrap_servers=self.bootstrap_servers,
             client_id="webmon-recorder",
             group_id="webmon-recorder",
@@ -163,6 +162,8 @@ class DatabaseRecorder(object):
             ssl_keyfile=self.kafka_keyfile,
             ssl_cafile=self.kafka_cafile,
         )
+        if pattern:
+            consumer.subscribe(pattern=pattern)
         self.logger.debug("Running Kafka consumer")
         while self.running:
             for message in consumer:
