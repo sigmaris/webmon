@@ -1,0 +1,11 @@
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build Docker image for tests
+      run: docker build -f Dockerfile.tests -t webmon-tests .
+    - name: Run tests in container
+      run: docker run webmon-tests pytest
