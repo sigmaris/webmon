@@ -78,6 +78,7 @@ SELECT
 FROM check_result_log
 {optional_where}
 GROUP BY 1, 2
+{order_by}
 """
 SUMMARY_INSERT_SQL = """
 INSERT INTO check_daily_summary (
@@ -246,7 +247,7 @@ def run_rollup(config, args):
         params = {}
     with psycopg2.connect(config.database_conn_str) as txn:
         with txn.cursor() as curs:
-            summary_select = SUMMARY_SELECT_SQL.format(optional_where=date_where)
+            summary_select = SUMMARY_SELECT_SQL.format(optional_where=date_where, order_by="")
             insert = SUMMARY_INSERT_SQL.format(select=summary_select)
             curs.execute(insert, params)
             if args.trim:
@@ -275,13 +276,16 @@ def run_display(config, args):
                     count_pattern_matched
                 FROM check_daily_summary
                 {optional_where}
+                ORDER BY 2 DESC, 1
                 """,
                     params,
                 )
                 if curs.rowcount == 0:
                     if args.date is not None:
                         optional_where = "WHERE DATE(check_time) = %(day)s"
-                    curs.execute(SUMMARY_SELECT_SQL.format(optional_where=optional_where), params)
+                    curs.execute(SUMMARY_SELECT_SQL.format(
+                        optional_where=optional_where, order_by="ORDER BY 2 DESC, 1"
+                    ), params)
             else:
                 if args.date is not None:
                     optional_where = "WHERE DATE(check_time) = %(day)s"
